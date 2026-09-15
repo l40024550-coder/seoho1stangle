@@ -24,44 +24,31 @@ function labels(){const x=shuffle(LETTERS),m={};x.forEach((v,i)=>m[i]=v);return 
 function actualAngle(pos,theta){return isAcutePos(pos)?theta:180-theta}
 function remember(list,value,max){list.push(value);while(list.length>max)list.shift()}
 function randomAnswerAngle(){const candidates=[];for(let v=15;v<=165;v++)if(v!==90&&!recentSizeAnswers.includes(v))candidates.push(v);if(!candidates.length){recentSizeAnswers=[];for(let v=15;v<=165;v++)if(v!==90)candidates.push(v)}return pick(candidates)}
-function sizeGivenChoices(target){
-  const choices=[];
-  const neighbors=[(target%4+1)%4,(target%4+3)%4].map(w=>target<4?w:w+4);
-  neighbors.forEach(given=>choices.push({relation:'linear',given}));
-  choices.push({relation:'corresponding',given:corresponding(target)});
-  if(target>=2&&target<=5)choices.push({relation:'alternate',given:ALT[target]});
-  return shuffle(choices);
+function sizeGivenChoices(target,theta){
+  const forbidden=new Set([target,target^2,corresponding(target)]);
+  if(target>=2&&target<=5)forbidden.add(ALT[target]);
+  return shuffle([...Array(8).keys()].filter(given=>!forbidden.has(given)).map(given=>({given,relation:actualAngle(given,theta)===actualAngle(target,theta)?'equal':'supplementary'})));
 }
 function makeSizeQuestion(){
-  const answer=randomAnswerAngle();
-  const theta=answer<=90?answer:180-answer;
-  const target=pick([...Array(8).keys()]);
-  const choices=sizeGivenChoices(target);
-  const usable=choices.filter(c=>{const value=actualAngle(c.given,theta);return c.given!==target&&value!==answer&&!recentGivenValues.includes(value)});
-  const fallback=choices.filter(c=>c.given!==target&&!recentGivenValues.includes(actualAngle(c.given,theta)));
-  const c=pick(usable.length?usable:fallback.length?fallback:choices.filter(x=>x.given!==target));
-  const given=c.given,g=geometryForTheta(theta),targetPoint=target<4?g.top:g.bottom,givenPoint=given<4?g.top:g.bottom,givenValue=actualAngle(given,theta),targetValue=actualAngle(target,theta);
+  const answer=randomAnswerAngle(),theta=answer<=90?answer:180-answer,target=pick([...Array(8).keys()]);
+  const choices=sizeGivenChoices(target,theta);
+  const usable=choices.filter(c=>c.relation==='equal'||c.relation==='supplementary').filter(c=>{
+    const value=actualAngle(c.given,theta);return value!==answer&&!recentGivenValues.includes(value);
+  });
+  const fallback=choices.filter(c=>!recentGivenValues.includes(actualAngle(c.given,theta)));
+  const c=pick(usable.length?usable:fallback.length?fallback:choices),given=c.given,g=geometryForTheta(theta),targetPoint=target<4?g.top:g.bottom,givenPoint=given<4?g.top:g.bottom,givenValue=actualAngle(given,theta),targetValue=actualAngle(target,theta);
   if(targetValue!==answer)throw new Error('Size answer construction failed');
-  const valid=c.relation==='linear'?givenValue+targetValue===180:givenValue===targetValue;
-  if(!valid)throw new Error('Invalid size question generated');
+  if(c.relation==='equal'?givenValue!==targetValue:givenValue+targetValue!==180)throw new Error('Invalid size question generated');
   remember(recentSizeAnswers,answer,10);remember(recentGivenValues,givenValue,5);
   return{type:3,text:'각 a의 크기는?',answer:String(answer),theta,targetPoint,givenPoint,targetPos:wedge(target),givenPos:wedge(given),givenValue,relation:c.relation};
 }
 function makeRelationQuestion(type){
   for(let tries=0;tries<100;tries++){
     const m=labels();
-    if(type===1){
-      const p=pick([...Array(8).keys()]),answer=m[corresponding(p)];
-      if(!recentRelationAnswers.includes(answer)){remember(recentRelationAnswers,answer,5);return{type:1,m,answer,text:'각 a의 동위각은?'}}
-    }else{
-      const p=pick([2,3,4,5]),a=pick([...Array(8).keys()].filter(k=>k!==p&&k!==ALT[p]));
-      [m[p],m[a]]=[m[a],m[p]];
-      const answer=m[ALT[p]];
-      if(!recentRelationAnswers.includes(answer)){remember(recentRelationAnswers,answer,5);return{type:2,m,answer,text:'각 a의 엇각은?'}}
-    }
+    if(type===1){const p=pick([...Array(8).keys()]),answer=m[corresponding(p)];if(!recentRelationAnswers.includes(answer)){remember(recentRelationAnswers,answer,5);return{type:1,m,answer,text:'각 a의 동위각은?'}}}
+    else{const p=pick([2,3,4,5]),a=pick([...Array(8).keys()].filter(k=>k!==p&&k!==ALT[p]));[m[p],m[a]]=[m[a],m[p]];const answer=m[ALT[p]];if(!recentRelationAnswers.includes(answer)){remember(recentRelationAnswers,answer,5);return{type:2,m,answer,text:'각 a의 엇각은?'}}}
   }
-  recentRelationAnswers=[];
-  return makeRelationQuestion(type);
+  recentRelationAnswers=[];return makeRelationQuestion(type);
 }
 function newQuestion(){const r=Math.random();if(r<.10)return makeRelationQuestion(1);if(r<.20)return makeRelationQuestion(2);return makeSizeQuestion()}
 function render(){if(!state)return;const q=state.q=newQuestion();$('questionNo').textContent=state.index+1;$('questionType').textContent=q.type===1?'동위각':q.type===2?'엇각':'평행선에서 각의 크기';$('questionText').textContent=q.text;$('diagram').innerHTML=q.type<3?diagram(q.m):sizeDiagram(q);$('answerInput').value='';$('answerInput').disabled=locked;if(!locked)$('answerInput').focus()}
