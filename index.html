@@ -13,7 +13,7 @@
       <div class="hero">
         <p class="eyebrow">중학교 수학 · 개념 복습</p>
         <h1>동위각 · 엇각<br><span>스피드 퀴즈</span></h1>
-        <p class="subtitle">시간 안에 최대한 많은 문제를 해결해 보세요!</p>
+        <p class="subtitle">5분 동안 최대한 많은 문제를 해결해 보세요!</p>
       </div>
       <div class="card form-card">
         <label for="studentNo">학생 번호</label>
@@ -33,7 +33,7 @@
     <section id="game" class="screen">
       <header class="game-header">
         <div><span class="small-label">점수</span><strong id="score">0</strong></div>
-        <div class="timer-wrap"><span class="small-label">남은 시간</span><strong id="timer">60</strong><span>초</span></div>
+        <div class="timer-wrap"><span class="small-label">남은 시간</span><strong id="timer">300</strong><span>초</span></div>
         <div><span class="small-label">문제</span><strong id="questionNo">1</strong></div>
       </header>
       <div class="card game-card">
@@ -72,10 +72,10 @@
 
     <section id="admin" class="screen">
       <div class="card narrow">
-        <p class="eyebrow">관리자 화면</p><h1>테스트 / 랭킹 관리</h1>
+        <p class="eyebrow">관리자 화면</p><h1>테스트</h1>
         <p class="admin-note">테스트 모드는 30초이며 정식 랭킹에는 저장하지 않습니다.</p>
         <button id="testBtn" class="primary">테스트 하기</button>
-        <button id="resetBtn" class="danger">랭킹 초기화하기</button>
+        <p class="admin-note">랭킹 초기화는 Firebase 콘솔의 Firestore에서 <b>scores</b> 컬렉션을 삭제하세요.</p>
         <button class="ghost backHome">처음으로</button>
         <p id="adminMessage" class="message"></p>
       </div>
