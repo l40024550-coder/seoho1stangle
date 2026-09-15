@@ -3,10 +3,10 @@ import { getFirestore,collection,addDoc,getDocs,query,orderBy,limit } from 'http
 import { firebaseConfig } from './firebase-config.js';
 
 const app=initializeApp(firebaseConfig),db=getFirestore(app),scoresRef=collection(db,'scores');
-const ADMIN_PASSWORD='4550',NORMAL_TIME=300,TEST_TIME=30,LETTERS=['a','b','c','d','e','f','g','h'],ANGLES=[30,45,60,120,135,150];
+const ADMIN_PASSWORD='4550',NORMAL_TIME=300,TEST_TIME=30,LETTERS=['a','b','c','d','e','f','g','h'];
 const ALT={2:4,3:5,4:2,5:3};
 let player={studentNo:'',name:''},state=null,timerId=null,locked=false,submitting=false,wrongUnlockTimerId=null;
-let sizeAnswerPool=[],lastSizeAnswer=null,recentGiven=[];
+let recentSizeAnswers=[],recentGivenValues=[],recentRelationAnswers=[];
 const $=id=>document.getElementById(id),show=id=>{document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));$(id).classList.add('active')};
 function shuffle(a){const x=[...a];for(let i=x.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[x[i],x[j]]=[x[j],x[i]]}return x}
 const pick=a=>a[Math.floor(Math.random()*a.length)];
@@ -22,24 +22,50 @@ function diagram(m){const g=geometryForTheta(60),items=[];for(let i=0;i<4;i++)it
 function sizeDiagram(q){const g=geometryForTheta(q.theta);return baseSvg(g,[{point:q.targetPoint,w:q.targetPos,text:'a'},{point:q.givenPoint,w:q.givenPos,text:q.givenValue+'°'}],true)}
 function labels(){const x=shuffle(LETTERS),m={};x.forEach((v,i)=>m[i]=v);return m}
 function actualAngle(pos,theta){return isAcutePos(pos)?theta:180-theta}
-function nextSizeAnswer(){if(sizeAnswerPool.length===0){sizeAnswerPool=shuffle(ANGLES);if(sizeAnswerPool.length>1&&sizeAnswerPool[0]===lastSizeAnswer)[sizeAnswerPool[0],sizeAnswerPool[1]]=[sizeAnswerPool[1],sizeAnswerPool[0]]}const v=sizeAnswerPool.shift();lastSizeAnswer=v;return v}
-function makeSizeQuestion(){
-  const theta=nextSizeAnswer(),target=pick([...Array(8).keys()]);
+function remember(list,value,max){list.push(value);while(list.length>max)list.shift()}
+function randomAnswerAngle(){const candidates=[];for(let v=15;v<=165;v++)if(v!==90&&!recentSizeAnswers.includes(v))candidates.push(v);if(!candidates.length){recentSizeAnswers=[];for(let v=15;v<=165;v++)if(v!==90)candidates.push(v)}return pick(candidates)}
+function sizeGivenChoices(target){
   const choices=[];
-  choices.push({relation:'corresponding',given:corresponding(target)});
-  if(target>=2&&target<=5)choices.push({relation:'alternate',given:ALT[target]});
   const neighbors=[(target%4+1)%4,(target%4+3)%4].map(w=>target<4?w:w+4);
   neighbors.forEach(given=>choices.push({relation:'linear',given}));
-  const usable=choices.filter(c=>!recentGiven.includes(actualAngle(c.given,theta)));
-  const c=pick(usable.length?usable:choices),given=c.given,g=geometryForTheta(theta),targetPoint=target<4?g.top:g.bottom,givenPoint=given<4?g.top:g.bottom,givenValue=actualAngle(given,theta),answer=actualAngle(target,theta);
-  const valid=c.relation==='linear'?givenValue+answer===180:givenValue===answer;
+  choices.push({relation:'corresponding',given:corresponding(target)});
+  if(target>=2&&target<=5)choices.push({relation:'alternate',given:ALT[target]});
+  return shuffle(choices);
+}
+function makeSizeQuestion(){
+  const answer=randomAnswerAngle();
+  const theta=answer<=90?answer:180-answer;
+  const target=pick([...Array(8).keys()]);
+  const choices=sizeGivenChoices(target);
+  const usable=choices.filter(c=>{const value=actualAngle(c.given,theta);return c.given!==target&&value!==answer&&!recentGivenValues.includes(value)});
+  const fallback=choices.filter(c=>c.given!==target&&!recentGivenValues.includes(actualAngle(c.given,theta)));
+  const c=pick(usable.length?usable:fallback.length?fallback:choices.filter(x=>x.given!==target));
+  const given=c.given,g=geometryForTheta(theta),targetPoint=target<4?g.top:g.bottom,givenPoint=given<4?g.top:g.bottom,givenValue=actualAngle(given,theta),targetValue=actualAngle(target,theta);
+  if(targetValue!==answer)throw new Error('Size answer construction failed');
+  const valid=c.relation==='linear'?givenValue+targetValue===180:givenValue===targetValue;
   if(!valid)throw new Error('Invalid size question generated');
-  recentGiven.push(givenValue);if(recentGiven.length>3)recentGiven.shift();
+  remember(recentSizeAnswers,answer,10);remember(recentGivenValues,givenValue,5);
   return{type:3,text:'각 a의 크기는?',answer:String(answer),theta,targetPoint,givenPoint,targetPos:wedge(target),givenPos:wedge(given),givenValue,relation:c.relation};
 }
-function newQuestion(){const r=Math.random();if(r<.10){const m=labels(),p=+Object.keys(m).find(k=>m[k]==='a');return{type:1,m,answer:m[corresponding(p)],text:'각 a의 동위각은?'}}if(r<.20){const m=labels(),p=pick([2,3,4,5]),a=+Object.keys(m).find(k=>m[k]==='a');[m[p],m[a]]=[m[a],m[p]];return{type:2,m,answer:m[ALT[p]],text:'각 a의 엇각은?'}}return makeSizeQuestion()}
+function makeRelationQuestion(type){
+  for(let tries=0;tries<100;tries++){
+    const m=labels();
+    if(type===1){
+      const p=pick([...Array(8).keys()]),answer=m[corresponding(p)];
+      if(!recentRelationAnswers.includes(answer)){remember(recentRelationAnswers,answer,5);return{type:1,m,answer,text:'각 a의 동위각은?'}}
+    }else{
+      const p=pick([2,3,4,5]),a=pick([...Array(8).keys()].filter(k=>k!==p&&k!==ALT[p]));
+      [m[p],m[a]]=[m[a],m[p]];
+      const answer=m[ALT[p]];
+      if(!recentRelationAnswers.includes(answer)){remember(recentRelationAnswers,answer,5);return{type:2,m,answer,text:'각 a의 엇각은?'}}
+    }
+  }
+  recentRelationAnswers=[];
+  return makeRelationQuestion(type);
+}
+function newQuestion(){const r=Math.random();if(r<.10)return makeRelationQuestion(1);if(r<.20)return makeRelationQuestion(2);return makeSizeQuestion()}
 function render(){if(!state)return;const q=state.q=newQuestion();$('questionNo').textContent=state.index+1;$('questionType').textContent=q.type===1?'동위각':q.type===2?'엇각':'평행선에서 각의 크기';$('questionText').textContent=q.text;$('diagram').innerHTML=q.type<3?diagram(q.m):sizeDiagram(q);$('answerInput').value='';$('answerInput').disabled=locked;if(!locked)$('answerInput').focus()}
-function start(test=false){if(!test){player.studentNo=$('studentNo').value.trim();player.name=$('studentName').value.trim();if(!player.studentNo||!player.name){$('homeMessage').textContent='학생 번호와 이름을 입력하세요.';return}}clearInterval(timerId);if(wrongUnlockTimerId)clearTimeout(wrongUnlockTimerId);sizeAnswerPool=[];lastSizeAnswer=null;recentGiven=[];state={score:0,correct:0,wrong:0,index:0,test,finished:false};locked=false;submitting=false;show('game');$('score').textContent='0';$('feedback').textContent='';let t=test?TEST_TIME:NORMAL_TIME;$('timer').textContent=t;render();timerId=setInterval(()=>{if(!state)return;t--;$('timer').textContent=t;if(t<=0)end()},1000)}
+function start(test=false){if(!test){player.studentNo=$('studentNo').value.trim();player.name=$('studentName').value.trim();if(!player.studentNo||!player.name){$('homeMessage').textContent='학생 번호와 이름을 입력하세요.';return}}clearInterval(timerId);if(wrongUnlockTimerId)clearTimeout(wrongUnlockTimerId);recentSizeAnswers=[];recentGivenValues=[];recentRelationAnswers=[];state={score:0,correct:0,wrong:0,index:0,test,finished:false};locked=false;submitting=false;show('game');$('score').textContent='0';$('feedback').textContent='';let t=test?TEST_TIME:NORMAL_TIME;$('timer').textContent=t;render();timerId=setInterval(()=>{if(!state)return;t--;$('timer').textContent=t;if(t<=0)end()},1000)}
 function submit(e){e.preventDefault();if(!state||state.finished||locked||submitting)return;submitting=true;const s=state,q=s.q,answer=$('answerInput').value.trim().toLowerCase(),ok=answer===String(q.answer).toLowerCase();if(ok){s.score++;s.correct++;s.index++;$('score').textContent=s.score;$('feedback').textContent='정답! +1점';submitting=false;render();return}s.score-=2;s.wrong++;$('score').textContent=s.score;$('feedback').textContent='오답! -2점 · 3초 동안 입력할 수 없습니다.';locked=true;$('answerInput').disabled=true;wrongUnlockTimerId=setTimeout(()=>{if(state!==s||s.finished)return;locked=false;submitting=false;s.index++;render()},3000)}
 async function saveScore(x){await addDoc(scoresRef,{studentNo:player.studentNo,name:player.name,score:x.score,correct:x.correct,wrong:x.wrong,mode:'normal',createdAt:Date.now()})}
 function escapeHtml(v){return String(v).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#039;')}
