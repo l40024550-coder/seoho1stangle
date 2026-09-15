@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#111827">
+  <title>동위각·엇각 스피드 퀴즈</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="app">
+    <section id="home" class="screen active">
+      <div class="hero">
+        <p class="eyebrow">중학교 수학 · 개념 복습</p>
+        <h1>동위각 · 엇각<br><span>스피드 퀴즈</span></h1>
+        <p class="subtitle">시간 안에 최대한 많은 문제를 해결해 보세요!</p>
+      </div>
+      <div class="card form-card">
+        <label for="studentNo">학생 번호</label>
+        <input id="studentNo" inputmode="numeric" maxlength="4" placeholder="예: 301" autocomplete="off">
+        <label for="studentName">이름</label>
+        <input id="studentName" maxlength="10" placeholder="이름을 입력하세요" autocomplete="off">
+        <button id="startBtn" class="primary">게임 시작</button>
+        <button id="adminBtn" class="ghost">관리자</button>
+      </div>
+      <div class="ranking-card card">
+        <div class="section-title"><h2>TOP 5</h2><span id="rankingStatus">기록을 불러오는 중…</span></div>
+        <ol id="rankingList" class="ranking-list"></ol>
+      </div>
+      <p id="homeMessage" class="message"></p>
+    </section>
+
+    <section id="game" class="screen">
+      <header class="game-header">
+        <div><span class="small-label">점수</span><strong id="score">0</strong></div>
+        <div class="timer-wrap"><span class="small-label">남은 시간</span><strong id="timer">60</strong><span>초</span></div>
+        <div><span class="small-label">문제</span><strong id="questionNo">1</strong></div>
+      </header>
+      <div class="card game-card">
+        <p id="questionType" class="question-type"></p>
+        <h2 id="questionText">문제</h2>
+        <div id="diagram" class="diagram" aria-label="각도 문제 그림"></div>
+        <form id="answerForm" class="answer-form">
+          <input id="answerInput" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="답을 입력하세요" aria-label="정답 입력">
+          <button class="primary" type="submit">제출</button>
+        </form>
+        <p id="feedback" class="feedback" aria-live="polite"></p>
+      </div>
+    </section>
+
+    <section id="result" class="screen">
+      <div class="card result-card">
+        <p class="eyebrow">게임 종료</p>
+        <h1 id="resultTitle">수고했어요!</h1>
+        <div class="final-score"><span>최종 점수</span><strong id="finalScore">0</strong></div>
+        <div class="result-stats"><div><b id="correctCount">0</b><span>정답</span></div><div><b id="wrongCount">0</b><span>오답</span></div></div>
+        <p id="saveStatus" class="message"></p>
+        <button id="homeBtn" class="primary">처음으로</button>
+      </div>
+    </section>
+
+    <section id="adminLogin" class="screen">
+      <div class="card narrow">
+        <p class="eyebrow">관리자</p><h1>관리자 인증</h1>
+        <label for="adminPassword">비밀번호</label>
+        <input id="adminPassword" type="password" inputmode="numeric" maxlength="4" placeholder="4자리 비밀번호">
+        <button id="adminLoginBtn" class="primary">확인</button>
+        <button class="ghost backHome">돌아가기</button>
+        <p id="adminLoginMessage" class="message"></p>
+      </div>
+    </section>
+
+    <section id="admin" class="screen">
+      <div class="card narrow">
+        <p class="eyebrow">관리자 화면</p><h1>테스트 / 랭킹 관리</h1>
+        <p class="admin-note">테스트 모드는 30초이며 정식 랭킹에는 저장하지 않습니다.</p>
+        <button id="testBtn" class="primary">테스트 하기</button>
+        <button id="resetBtn" class="danger">랭킹 초기화하기</button>
+        <button class="ghost backHome">처음으로</button>
+        <p id="adminMessage" class="message"></p>
+      </div>
+    </section>
+  </main>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
