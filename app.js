@@ -20,11 +20,9 @@ function geometryForTheta(theta){
   const shift=gap/Math.tan(rad);
   const top={x:centerX+shift/2,y:105};
   const bottom={x:centerX-shift/2,y:205};
-  const dx=top.x-bottom.x,dy=top.y-bottom.y,len=Math.hypot(dx,dy),ux=dx/len,uy=dy/len;
-  const ext=115;
+  const dx=top.x-bottom.x,dy=top.y-bottom.y,len=Math.hypot(dx,dy),ux=dx/len,uy=dy/len,ext=115;
   return{theta,alpha,top,bottom,transversal:{x1:bottom.x-ux*ext,y1:bottom.y-uy*ext,x2:top.x+ux*ext,y2:top.y+uy*ext}};
 }
-
 const WEDGE_RANGES=alpha=>[[-180,-alpha],[-alpha,0],[0,180-alpha],[180-alpha,180]];
 function arcPath(cx,cy,w,r,alpha){
   const [a1,a2]=WEDGE_RANGES(alpha)[w],rad=d=>d*Math.PI/180;
@@ -63,48 +61,54 @@ function sizeDiagram(q){
   return baseSvg(g,[{point:q.targetPoint,w:q.targetPos,text:'a'},{point:q.givenPoint,w:q.givenPos,text:q.givenValue+'°'}],true);
 }
 function labels(){const x=shuffle(LETTERS),m={};x.forEach((v,i)=>m[i]=v);return m}
-function positionsForAngle(value){return value<90?[1,3]:[0,2]}
+
+// 각 위치의 실제 각 크기(예각/둔각)를 반환한다.
+function actualAngle(pos,theta){return isAcutePos(pos)?theta:180-theta}
+
+// 크기 문제의 관계를 '생성 전에' 먼저 결정한다.
+// corresponding: 동위각 -> 같은 크기
+// alternate: 엇각 -> 같은 크기
+// linear: 같은 교점에서 이웃한 각 -> 합이 180도
+function makeSizeQuestion(){
+  const theta=pick(ANGLES);
+  const target=pick([...Array(8).keys()]);
+  const relation=pick(['corresponding','alternate','linear']);
+  let given;
+
+  if(relation==='corresponding'){
+    given=corresponding(target);
+  }else if(relation==='alternate'){
+    // 엇각은 두 교점 사이의 내부각만 사용한다.
+    if(target===2)given=5;
+    else if(target===3)given=4;
+    else if(target===4)given=3;
+    else if(target===5)given=2;
+    else return makeSizeQuestion();
+  }else{
+    // 같은 교점에서 바로 옆 각. 어떤 위치든 정확히 하나의 이웃각을 선택한다.
+    given=pick([(target+1)%4,(target+3)%4]);
+    if(target>=4)given+=4;
+  }
+
+  const g=geometryForTheta(theta);
+  const targetPoint=target<4?g.top:g.bottom;
+  const givenPoint=given<4?g.top:g.bottom;
+  const givenValue=actualAngle(given,theta);
+  const answer=actualAngle(target,theta);
+
+  // 생성 검증: 그림에 표시되는 주어진 숫자와 실제 given 위치의 각이 반드시 일치하고,
+  // 관계식으로 target의 답이 하나로 결정되는지 확인한다.
+  const valid=relation==='linear'
+    ? givenValue+answer===180
+    : givenValue===answer;
+  if(!valid)return makeSizeQuestion();
+
+  return{type:3,text:'각 a의 크기는?',answer:String(answer),theta,targetPoint,givenPoint,targetPos:wedge(target),givenPos:wedge(given),givenValue,relation};
+}
 function relationType(){
-  // 각의 크기 문제가 80%: 단순 관계명 문제보다 실제 각의 성질을 적용하는 문제를 많이 출제한다.
-  return Math.random()<0.80?pick([3,4]):pick([1,2]);
+  // 크기 문제 80%. 크기 문제 안에서는 동위각/엇각/이웃한 각을 균형 있게 출제한다.
+  return Math.random()<0.80?3:pick([1,2]);
 }
-
-function sizeQuestion(){
-  // targetPos = 구해야 할 a의 위치.
-  // givenPos는 a와 직접 동위각/엇각인 위치를 일부러 피한다.
-  // 따라서 학생은 '같은 크기'인지 '180도에서 빼야 하는지'를 판단해야 한다.
-  const targetValue=pick(ANGLES);
-  const targetPos=pick(positionsForAngle(targetValue));
-  const targetGlobal=targetPos; // target is at upper intersection for 0~3
-  const forbidden=new Set([
-    targetGlobal,
-    corresponding(targetGlobal),
-    targetGlobal^2 // 같은 교점에서 맞꼭지각인 위치도 제외
-  ]);
-  // a와 직접적인 동위각/맞꼭지각/엇각이 아닌 위치 중에서 주어진 각을 고른다.
-  // 남는 위치는 정확히 하나 이상이며, 그 각은 a와 이웃 관계가 된다.
-  const candidates=[0,1,2,3,4,5,6,7].filter(p=>!forbidden.has(p));
-  const givenGlobal=pick(candidates);
-  const sameSize=isAcutePos(givenGlobal)===isAcutePos(targetGlobal);
-  // 주어진 숫자는 그림의 givenGlobal 각의 실제 크기. a의 크기는 targetValue.
-  const givenValue=sameSize?targetValue:180-targetValue;
-  const g=geometryForTheta(targetValue);
-  const targetPoint=targetGlobal<4?g.top:g.bottom;
-  const givenPoint=givenGlobal<4?g.top:g.bottom;
-  return{
-    type:Math.random()<0.5?3:4,
-    answer:String(targetValue),
-    text:'각 a의 크기는?',
-    targetPoint,
-    givenPoint,
-    targetPos:wedge(targetGlobal),
-    givenPos:wedge(givenGlobal),
-    givenValue,
-    theta:targetValue,
-    value:targetValue
-  };
-}
-
 function newQuestion(){
   const type=relationType();
   if(type===1){
@@ -116,7 +120,7 @@ function newQuestion(){
     [m[p],m[a]]=[m[a],m[p]];
     return{type,m,answer:m[ALT[p]],text:'각 a의 엇각은?'};
   }
-  return sizeQuestion();
+  return makeSizeQuestion();
 }
 function render(){
   if(!state)return;
