@@ -40,12 +40,18 @@ function pick(a) {
   return a[Math.floor(Math.random() * a.length)];
 }
 
-// 각 교점 주변의 실제 각 영역: 0 왼쪽 위, 1 오른쪽 위, 2 오른쪽 아래, 3 왼쪽 아래
+// 실제 교점: 위쪽 교점은 (393,105), 아래쪽 교점은 (207,205)
+const TOP = { x: 393, y: 105 };
+const BOTTOM = { x: 207, y: 205 };
+
+// 각 교점의 실제 각 영역 안쪽에 배치한다.
+// 0: 왼쪽 위, 1: 오른쪽 위(좁은 영역), 2: 오른쪽 아래, 3: 왼쪽 아래(좁은 영역)
+// 횡단선의 기울기를 고려하여 각 영역의 중앙 방향에 맞춘 좌표이다.
 const offsets = [
-  [-30, -18],
-  [28, -12],
-  [28, 25],
-  [-30, 27]
+  [-8, -31],
+  [31, -8],
+  [8, 31],
+  [-31, 8]
 ];
 
 function correspondingPosition(p) {
@@ -72,14 +78,14 @@ function diagram(m) {
       .dot{fill:#111827}
     </style>
     <path class="g" d="M45 105H555M45 205H555M85 270L515 40"/>
-    <circle class="dot" cx="207" cy="105" r="4"/>
-    <circle class="dot" cx="393" cy="205" r="4"/>`;
+    <circle class="dot" cx="393" cy="105" r="4"/>
+    <circle class="dot" cx="207" cy="205" r="4"/>`;
 
   for (let i = 0; i < 4; i++) {
-    s += `<text class="t" x="${207 + offsets[i][0]}" y="${105 + offsets[i][1]}">${m[i]}</text>`;
+    s += `<text class="t" x="${TOP.x + offsets[i][0]}" y="${TOP.y + offsets[i][1]}">${m[i]}</text>`;
   }
   for (let i = 0; i < 4; i++) {
-    s += `<text class="t" x="${393 + offsets[i][0]}" y="${205 + offsets[i][1]}">${m[i + 4]}</text>`;
+    s += `<text class="t" x="${BOTTOM.x + offsets[i][0]}" y="${BOTTOM.y + offsets[i][1]}">${m[i + 4]}</text>`;
   }
 
   return s + '</svg>';
@@ -95,11 +101,19 @@ function sizeDiagram(q) {
     </style>
     <path class="g" d="M45 105H555M45 205H555M85 270L515 40"/>
     <path class="d" d="M45 80H555M45 230H555"/>
-    <circle class="dot" cx="207" cy="105" r="4"/>
-    <circle class="dot" cx="393" cy="205" r="4"/>
-    <text class="t" x="${207 + q.ao[0]}" y="${105 + q.ao[1]}">a</text>
-    <text class="t" x="${393 + q.go[0]}" y="${205 + q.go[1]}">${q.value}°</text>
+    <circle class="dot" cx="393" cy="105" r="4"/>
+    <circle class="dot" cx="207" cy="205" r="4"/>
+    <text class="t" x="${q.targetPoint.x + q.ao[0]}" y="${q.targetPoint.y + q.ao[1]}">a</text>
+    <text class="t" x="${q.givenPoint.x + q.go[0]}" y="${q.givenPoint.y + q.go[1]}">${q.value}°</text>
   </svg>`;
+}
+
+function pointForPosition(p) {
+  return p < 4 ? TOP : BOTTOM;
+}
+
+function offsetForPosition(p) {
+  return offsets[p < 4 ? p : p - 4];
 }
 
 function newQuestion() {
@@ -129,15 +143,19 @@ function newQuestion() {
   }
 
   const value = pick(ANGLES);
-  const targetOffsets = target < 4 ? offsets[target] : offsets[target - 4];
-  const givenOffsets = given < 4 ? offsets[given] : offsets[given - 4];
+  const targetPoint = pointForPosition(target);
+  const givenPoint = pointForPosition(given);
+  const ao = offsetForPosition(target);
+  const go = offsetForPosition(given);
 
   return {
     type,
     answer: String(value),
     text: '각 a의 크기는?',
-    ao: targetOffsets,
-    go: givenOffsets,
+    targetPoint,
+    givenPoint,
+    ao,
+    go,
     value
   };
 }
