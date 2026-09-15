@@ -20,22 +20,153 @@ function shuffle(a){return [...a].sort(()=>Math.random()-0.5);}
 function pick(a){return a[Math.floor(Math.random()*a.length)];}
 const TOP={x:393,y:105};
 const BOTTOM={x:207,y:205};
-// Position labels at the centers of the four actual angle regions.
-const offsets=[[-27,-30],[32,-12],[27,30],[-32,12]];
+
+// 각 교점의 실제 네 각 영역을 화면 좌표 기준으로 정의한다.
+// 0: 왼쪽 위의 큰 각, 1: 오른쪽 위의 작은 각,
+// 2: 오른쪽 아래의 큰 각, 3: 왼쪽 아래의 작은 각
+const WEDGE_ANGLES=[[180,332],[332,360],[0,152],[152,180]];
+const ARC_RADIUS=25;
+const LABEL_RADIUS=42;
+
+function polarPoint(point,radius,angleDeg){
+  const rad=angleDeg*Math.PI/180;
+  return {x:point.x+radius*Math.cos(rad),y:point.y+radius*Math.sin(rad)};
+}
+
+function arcPath(point,startDeg,endDeg,radius=ARC_RADIUS){
+  const a=polarPoint(point,radius,startDeg);
+  const b=polarPoint(point,radius,endDeg);
+  const span=endDeg-startDeg;
+  const largeArc=span>180?1:0;
+  return `M ${a.x.toFixed(2)} ${a.y.toFixed(2)} A ${radius} ${radius} 0 ${largeArc} 1 ${b.x.toFixed(2)} ${b.y.toFixed(2)}`;
+}
+
+function wedgeArc(point,position,className='arc'){
+  const [start,end]=WEDGE_ANGLES[position];
+  return `<path class="${className}" d="${arcPath(point,start,end)}"/>`;
+}
+
+function labelPoint(point,position){
+  const [start,end]=WEDGE_ANGLES[position];
+  const mid=start+(end-start)/2;
+  return polarPoint(point,LABEL_RADIUS,mid);
+}
+
 function correspondingPosition(p){return p+4;}
 function alternatePosition(p){const map={2:7,3:6,6:3,7:2};return map[p]??((p+4)%8);}
 function labels(){const x=shuffle(LETTERS),m={};x.forEach((v,i)=>m[i]=v);return m;}
-function diagram(m){let s=`<svg viewBox="0 0 600 300" role="img" aria-label="두 직선과 횡단선으로 이루어진 각의 그림"><style>.g{stroke:#111827;stroke-width:4;fill:none;stroke-linecap:round}.t{font:700 22px system-ui,sans-serif;fill:#111827;text-anchor:middle;dominant-baseline:middle}.dot{fill:#111827}</style><path class="g" d="M45 105H555M45 205H555M85 270L515 40"/><circle class="dot" cx="393" cy="105" r="4"/><circle class="dot" cx="207" cy="205" r="4"/>`;
-for(let i=0;i<4;i++)s+=`<text class="t" x="${TOP.x+offsets[i][0]}" y="${TOP.y+offsets[i][1]}">${m[i]}</text>`;
-for(let i=0;i<4;i++)s+=`<text class="t" x="${BOTTOM.x+offsets[i][0]}" y="${BOTTOM.y+offsets[i][1]}">${m[i+4]}</text>`;
-return s+'</svg>';}
+
+function diagram(m){
+  let s=`<svg viewBox="0 0 600 300" role="img" aria-label="두 직선과 횡단선으로 이루어진 각의 그림">
+  <style>
+    .g{stroke:#111827;stroke-width:4;fill:none;stroke-linecap:round}
+    .arc{stroke:#6b7280;stroke-width:2;fill:none}
+    .t{font:700 22px system-ui,sans-serif;fill:#111827;text-anchor:middle;dominant-baseline:middle}
+    .dot{fill:#111827}
+  </style>
+  <path class="g" d="M45 105H555M45 205H555M85 270L515 40"/>
+  <circle class="dot" cx="393" cy="105" r="4"/>
+  <circle class="dot" cx="207" cy="205" r="4"/>`;
+
+  // 모든 각 영역에 작은 호를 표시한다.
+  for(let i=0;i<4;i++)s+=wedgeArc(TOP,i);
+  for(let i=0;i<4;i++)s+=wedgeArc(BOTTOM,i);
+
+  // 문자의 중심을 각 호의 안쪽 중앙에 배치한다.
+  for(let i=0;i<4;i++){
+    const p=labelPoint(TOP,i);
+    s+=`<text class="t" x="${p.x.toFixed(1)}" y="${p.y.toFixed(1)}">${m[i]}</text>`;
+  }
+  for(let i=0;i<4;i++){
+    const p=labelPoint(BOTTOM,i);
+    s+=`<text class="t" x="${p.x.toFixed(1)}" y="${p.y.toFixed(1)}">${m[i+4]}</text>`;
+  }
+  return s+'</svg>';
+}
+
 function pointForPosition(p){return p<4?TOP:BOTTOM;}
-function offsetForPosition(p){return offsets[p<4?p:p-4];}
-function sizeDiagram(q){return `<svg viewBox="0 0 600 300" role="img" aria-label="평행선과 횡단선의 각 크기 문제 그림"><style>.g{stroke:#111827;stroke-width:4;fill:none;stroke-linecap:round}.t{font:700 21px system-ui,sans-serif;fill:#111827;text-anchor:middle;dominant-baseline:middle}.d{stroke:#6b7280;stroke-width:1.5;stroke-dasharray:5 5}.dot{fill:#111827}</style><path class="g" d="M45 105H555M45 205H555M85 270L515 40"/><path class="d" d="M45 80H555M45 230H555"/><circle class="dot" cx="393" cy="105" r="4"/><circle class="dot" cx="207" cy="205" r="4"/><text class="t" x="${q.targetPoint.x+q.ao[0]}" y="${q.targetPoint.y+q.ao[1]}">a</text><text class="t" x="${q.givenPoint.x+q.go[0]}" y="${q.givenPoint.y+q.go[1]}">${q.value}°</text></svg>`;}
-function newQuestion(){const type=1+Math.floor(Math.random()*4);if(type<3){const m=labels(),p=Number(Object.keys(m).find(k=>m[k]==='a')),answer=m[type===1?correspondingPosition(p):alternatePosition(p)];return{type,m,answer,text:type===1?'각 a의 동위각은?':'각 a의 엇각은?'};}let target,given;if(type===3){target=Math.floor(Math.random()*8);given=target+4;}else{target=pick([2,3,4,5]);given=alternatePosition(target);}const value=pick(ANGLES),targetPoint=pointForPosition(target),givenPoint=pointForPosition(given),ao=offsetForPosition(target),go=offsetForPosition(given);return{type,answer:String(value),text:'각 a의 크기는?',targetPoint,givenPoint,ao,go,value};}
-function render(){const q=state.q=newQuestion();$('questionNo').textContent=state.index+1;$('questionType').textContent=q.type===1?'동위각':q.type===2?'엇각':'평행선에서 각의 크기';$('questionText').textContent=q.text;$('diagram').innerHTML=q.type<3?diagram(q.m):sizeDiagram(q);$('answerInput').value='';$('answerInput').disabled=locked;if(!locked)$('answerInput').focus();}
-function start(test=false){if(!test){player.studentNo=$('studentNo').value.trim();player.name=$('studentName').value.trim();if(!player.studentNo||!player.name){$('homeMessage').textContent='학생 번호와 이름을 입력하세요.';return;}}state={score:0,correct:0,wrong:0,index:0,test};locked=false;show('game');$('score').textContent='0';$('feedback').textContent='';let t=test?TEST_TIME:NORMAL_TIME;$('timer').textContent=t;render();clearInterval(timerId);timerId=setInterval(()=>{t--;$('timer').textContent=t;if(t<=0)end();},1000);}
-function submit(e){e.preventDefault();if(!state||locked)return;const answer=$('answerInput').value.trim().toLowerCase(),correctAnswer=state.q.answer.toLowerCase(),ok=answer===correctAnswer;if(ok){state.score++;state.correct++;$('score').textContent=state.score;$('feedback').textContent='정답! +1점';state.index++;render();}else{state.score-=2;state.wrong++;$('score').textContent=state.score;locked=true;$('answerInput').disabled=true;$('feedback').textContent='오답! -2점 · 3초 동안 입력할 수 없습니다.';setTimeout(()=>{if(state){locked=false;state.index++;render();}},3000);}}
+
+function sizeDiagram(q){
+  const targetPos=q.target%4;
+  const givenPos=q.given%4;
+  const targetLabel=labelPoint(q.targetPoint,targetPos);
+  const givenLabel=labelPoint(q.givenPoint,givenPos);
+  return `<svg viewBox="0 0 600 300" role="img" aria-label="평행선과 횡단선의 각 크기 문제 그림">
+  <style>
+    .g{stroke:#111827;stroke-width:4;fill:none;stroke-linecap:round}
+    .d{stroke:#6b7280;stroke-width:1.5;stroke-dasharray:5 5}
+    .arc{stroke:#6b7280;stroke-width:2;fill:none}
+    .t{font:700 21px system-ui,sans-serif;fill:#111827;text-anchor:middle;dominant-baseline:middle}
+    .dot{fill:#111827}
+  </style>
+  <path class="g" d="M45 105H555M45 205H555M85 270L515 40"/>
+  <path class="d" d="M45 80H555M45 230H555"/>
+  <circle class="dot" cx="393" cy="105" r="4"/>
+  <circle class="dot" cx="207" cy="205" r="4"/>
+  ${wedgeArc(q.targetPoint,targetPos)}
+  ${wedgeArc(q.givenPoint,givenPos)}
+  <text class="t" x="${targetLabel.x.toFixed(1)}" y="${targetLabel.y.toFixed(1)}">a</text>
+  <text class="t" x="${givenLabel.x.toFixed(1)}" y="${givenLabel.y.toFixed(1)}">${q.value}°</text>
+  </svg>`;
+}
+
+function newQuestion(){
+  const type=1+Math.floor(Math.random()*4);
+  if(type<3){
+    const m=labels(),p=Number(Object.keys(m).find(k=>m[k]==='a'));
+    const answer=m[type===1?correspondingPosition(p):alternatePosition(p)];
+    return{type,m,answer,text:type===1?'각 a의 동위각은?':'각 a의 엇각은?'};
+  }
+  let target,given;
+  if(type===3){target=Math.floor(Math.random()*8);given=target+4;}
+  else{target=pick([2,3,4,5]);given=alternatePosition(target);}
+  const value=pick(ANGLES),targetPoint=pointForPosition(target),givenPoint=pointForPosition(given);
+  return{type,answer:String(value),text:'각 a의 크기는?',targetPoint,givenPoint,target,given,value};
+}
+
+function render(){
+  const q=state.q=newQuestion();
+  $('questionNo').textContent=state.index+1;
+  $('questionType').textContent=q.type===1?'동위각':q.type===2?'엇각':'평행선에서 각의 크기';
+  $('questionText').textContent=q.text;
+  $('diagram').innerHTML=q.type<3?diagram(q.m):sizeDiagram(q);
+  $('answerInput').value='';
+  $('answerInput').disabled=locked;
+  if(!locked)$('answerInput').focus();
+}
+
+function start(test=false){
+  if(!test){
+    player.studentNo=$('studentNo').value.trim();
+    player.name=$('studentName').value.trim();
+    if(!player.studentNo||!player.name){$('homeMessage').textContent='학생 번호와 이름을 입력하세요.';return;}
+  }
+  state={score:0,correct:0,wrong:0,index:0,test};
+  locked=false;
+  show('game');
+  $('score').textContent='0';
+  $('feedback').textContent='';
+  let t=test?TEST_TIME:NORMAL_TIME;
+  $('timer').textContent=t;
+  render();
+  clearInterval(timerId);
+  timerId=setInterval(()=>{t--;$('timer').textContent=t;if(t<=0)end();},1000);
+}
+
+function submit(e){
+  e.preventDefault();
+  if(!state||locked)return;
+  const answer=$('answerInput').value.trim().toLowerCase();
+  const correctAnswer=state.q.answer.toLowerCase();
+  const ok=answer===correctAnswer;
+  if(ok){
+    state.score++;state.correct++;$('score').textContent=state.score;$('feedback').textContent='정답! +1점';state.index++;render();
+  }else{
+    state.score-=2;state.wrong++;$('score').textContent=state.score;locked=true;$('answerInput').disabled=true;$('feedback').textContent='오답! -2점 · 3초 동안 입력할 수 없습니다.';
+    setTimeout(()=>{if(state){locked=false;state.index++;render();}},3000);
+  }
+}
+
 async function saveScore(x){await addDoc(scoresRef,{studentNo:player.studentNo,name:player.name,score:x.score,correct:x.correct,wrong:x.wrong,mode:'normal',createdAt:Date.now()});}
 function escapeHtml(value){return String(value).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#039;');}
 async function loadRanking(){$('rankingStatus').textContent='기록을 불러오는 중…';try{const q=query(scoresRef,orderBy('score','desc'),limit(5)),snapshot=await getDocs(q),rows=[];snapshot.forEach(docSnap=>rows.push(docSnap.data()));$('rankingList').innerHTML=rows.length?rows.map((r,i)=>`<li><span>${i+1}위</span><b>${escapeHtml(r.name??'')}</b><strong>${Number(r.score??0)}점</strong></li>`).join(''):'<li class="empty">아직 기록이 없습니다.</li>';$('rankingStatus').textContent=`최고 점수 TOP ${rows.length}`;}catch(error){console.error(error);$('rankingStatus').textContent='랭킹을 불러오지 못했습니다.';$('rankingList').innerHTML='<li class="empty">Firestore 보안 규칙을 확인하세요.</li>';}}
