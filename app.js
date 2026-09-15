@@ -14,33 +14,23 @@ const corresponding=p=>p+4;
 const wedge=p=>p<4?p:p-4;
 const isAcutePos=p=>{const w=wedge(p);return w===1||w===3};
 
-// theta는 '그림에서 실제로 보이는 각'이다. 둔각 문제도 선의 기울기를 정확히 계산한 뒤
-// 해당 위치의 각을 120/135/150도로 보이게 한다. 따라서 120도 문제를 절대로 예각처럼 그리지 않는다.
+// 실제로 보이는 횡단선의 예각을 alpha로 계산한다.
+// value가 120/135/150이면 그림의 둔각 위치는 정확히 그 값이 된다.
 function geometryForTheta(theta){
   const alpha=theta<=90?theta:180-theta;
   const gap=100,centerX=300,rad=alpha*Math.PI/180;
   const shift=gap/Math.tan(rad);
   const top={x:centerX+shift/2,y:105};
   const bottom={x:centerX-shift/2,y:205};
-  const dx=top.x-bottom.x,dy=top.y-bottom.y;
-  const len=Math.hypot(dx,dy),ux=dx/len,uy=dy/len;
+  const dx=top.x-bottom.x,dy=top.y-bottom.y,len=Math.hypot(dx,dy),ux=dx/len,uy=dy/len;
   const ext=115;
-  return{
-    theta,
-    alpha,
-    top,
-    bottom,
-    transversal:{x1:bottom.x-ux*ext,y1:bottom.y-uy*ext,x2:top.x+ux*ext,y2:top.y+uy*ext}
-  };
+  return{theta,alpha,top,bottom,transversal:{x1:bottom.x-ux*ext,y1:bottom.y-uy*ext,x2:top.x+ux*ext,y2:top.y+uy*ext}};
 }
-
-// SVG 각도 위치: 0=왼쪽 위(둔각), 1=오른쪽 위(예각),
-// 2=오른쪽 아래(둔각), 3=왼쪽 아래(예각).
 const WEDGE_RANGES=alpha=>[[-180,-alpha],[-alpha,0],[0,180-alpha],[180-alpha,180]];
 function arcPath(cx,cy,w,r,alpha){
   const [a1,a2]=WEDGE_RANGES(alpha)[w],rad=d=>d*Math.PI/180;
   const x1=cx+r*Math.cos(rad(a1)),y1=cy+r*Math.sin(rad(a1)),x2=cx+r*Math.cos(rad(a2)),y2=cy+r*Math.sin(rad(a2));
-  return `M${x1.toFixed(1)} ${y1.toFixed(1)}A${r} ${r} 0 0 1 ${x2.toFixed(1)} ${y2.toFixed(1)}`;
+  return`M${x1.toFixed(1)} ${y1.toFixed(1)}A${r} ${r} 0 0 1 ${x2.toFixed(1)} ${y2.toFixed(1)}`;
 }
 function labelPoint(cx,cy,w,r,alpha){
   const [a1,a2]=WEDGE_RANGES(alpha)[w],a=((a1+a2)/2)*Math.PI/180;
@@ -49,7 +39,6 @@ function labelPoint(cx,cy,w,r,alpha){
 function baseSvg(g,items,guide=false){
   const fmt=n=>Number(n).toFixed(2);
   let s=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 300" preserveAspectRatio="xMidYMid meet" role="img" aria-label="평행선과 횡단선으로 이루어진 각도 그림">`;
-  // CSS 의존을 줄이고 선 자체에 stroke를 직접 지정하여 세 직선이 항상 독립적으로 렌더링되게 한다.
   s+=`<line x1="35" y1="105" x2="565" y2="105" stroke="#111" stroke-width="5" stroke-linecap="round"/>`;
   s+=`<line x1="35" y1="205" x2="565" y2="205" stroke="#111" stroke-width="5" stroke-linecap="round"/>`;
   s+=`<line x1="${fmt(g.transversal.x1)}" y1="${fmt(g.transversal.y1)}" x2="${fmt(g.transversal.x2)}" y2="${fmt(g.transversal.y2)}" stroke="#111" stroke-width="5" stroke-linecap="round"/>`;
@@ -74,22 +63,11 @@ function sizeDiagram(q){
   const g=geometryForTheta(q.theta);
   return baseSvg(g,[{point:q.targetPoint,w:q.targetPos,text:'a'},{point:q.givenPoint,w:q.givenPos,text:q.value+'°'}],true);
 }
-function labels(){
-  const x=shuffle(LETTERS),m={};
-  x.forEach((v,i)=>m[i]=v);
-  return m;
-}
-function positionsForAngle(value){
-  const acute=value<90;
-  return acute?[1,3]:[0,2];
-}
+function labels(){const x=shuffle(LETTERS),m={};x.forEach((v,i)=>m[i]=v);return m}
+function positionsForAngle(value){return value<90?[1,3]:[0,2]}
 function relationType(){
-  // 크기 문제 비중을 높여 단순히 위치만 찾는 문제보다 실제 각도 판단을 더 많이 연습하게 한다.
-  const r=Math.random();
-  if(r<0.15)return 1;
-  if(r<0.30)return 2;
-  if(r<0.65)return 3;
-  return 4;
+  // 난이도: 크기 계산 70%, 관계 찾기 30%.
+  return Math.random()<0.70?pick([3,4]):pick([1,2]);
 }
 function newQuestion(){
   const type=relationType();
@@ -103,18 +81,23 @@ function newQuestion(){
     return{type,m,answer:m[ALT[p]],text:'각 a의 엇각은?'};
   }
 
-  const value=pick(ANGLES),valid=positionsForAngle(value),targetPos=pick(valid);
+  // 크기 문제는 반드시 '주어진 각 -> a' 관계가 하나의 값으로 결정되도록 만든다.
+  // type 3: 동위각, type 4: 엇각. 주어진 숫자는 a의 각 자체가 아니라 관계에 있는 각이다.
+  const value=pick(ANGLES);
+  const targetPos=pick(positionsForAngle(value));
   let target,given;
   if(type===3){
     target=targetPos;
     given=target+4;
   }else{
+    // 엇각은 반드시 서로 다른 교점의 내부각(2,3,4,5) 중 하나를 사용한다.
     target=targetPos===0?2:targetPos===2?0:targetPos===1?3:1;
     given=ALT[target];
   }
-  const theta=value;
-  const g=geometryForTheta(theta),targetPoint=target<4?g.top:g.bottom,givenPoint=given<4?g.top:g.bottom;
-  return{type,answer:String(value),text:'각 a의 크기는?',targetPoint,givenPoint,targetPos:wedge(target),givenPos:wedge(given),value,angle:value,theta};
+  const g=geometryForTheta(value);
+  const targetPoint=target<4?g.top:g.bottom;
+  const givenPoint=given<4?g.top:g.bottom;
+  return{type,answer:String(value),text:'각 a의 크기는?',targetPoint,givenPoint,targetPos:wedge(target),givenPos:wedge(given),value,angle:value,theta:value};
 }
 function render(){
   if(!state)return;
@@ -128,29 +111,15 @@ function render(){
   if(!locked)$('answerInput').focus();
 }
 function start(test=false){
-  if(!test){
-    player.studentNo=$('studentNo').value.trim();
-    player.name=$('studentName').value.trim();
-    if(!player.studentNo||!player.name){$('homeMessage').textContent='학생 번호와 이름을 입력하세요.';return}
-  }
-  clearInterval(timerId);
-  if(wrongUnlockTimerId)clearTimeout(wrongUnlockTimerId);
-  state={score:0,correct:0,wrong:0,index:0,test,finished:false};
-  locked=false;submitting=false;show('game');$('score').textContent='0';$('feedback').textContent='';
-  let t=test?TEST_TIME:NORMAL_TIME;$('timer').textContent=t;render();
-  timerId=setInterval(()=>{if(!state)return;t--;$('timer').textContent=t;if(t<=0)end()},1000);
+  if(!test){player.studentNo=$('studentNo').value.trim();player.name=$('studentName').value.trim();if(!player.studentNo||!player.name){$('homeMessage').textContent='학생 번호와 이름을 입력하세요.';return}}
+  clearInterval(timerId);if(wrongUnlockTimerId)clearTimeout(wrongUnlockTimerId);state={score:0,correct:0,wrong:0,index:0,test,finished:false};locked=false;submitting=false;show('game');$('score').textContent='0';$('feedback').textContent='';let t=test?TEST_TIME:NORMAL_TIME;$('timer').textContent=t;render();timerId=setInterval(()=>{if(!state)return;t--;$('timer').textContent=t;if(t<=0)end()},1000)
 }
 function submit(e){
-  e.preventDefault();
-  if(!state||state.finished||locked||submitting)return;
-  submitting=true;
+  e.preventDefault();if(!state||state.finished||locked||submitting)return;submitting=true;
   const s=state,q=s.q,answer=$('answerInput').value.trim().toLowerCase(),ok=answer===String(q.answer).toLowerCase();
-  if(ok){
-    s.score++;s.correct++;s.index++;$('score').textContent=s.score;$('feedback').textContent='정답! +1점';submitting=false;render();return;
-  }
-  s.score-=2;s.wrong++;$('score').textContent=s.score;$('feedback').textContent='오답! -2점 · 3초 동안 입력할 수 없습니다.';
-  locked=true;$('answerInput').disabled=true;
-  wrongUnlockTimerId=setTimeout(()=>{if(state!==s||s.finished)return;locked=false;submitting=false;s.index++;render()},3000);
+  if(ok){s.score++;s.correct++;s.index++;$('score').textContent=s.score;$('feedback').textContent='정답! +1점';submitting=false;render();return}
+  s.score-=2;s.wrong++;$('score').textContent=s.score;$('feedback').textContent='오답! -2점 · 3초 동안 입력할 수 없습니다.';locked=true;$('answerInput').disabled=true;
+  wrongUnlockTimerId=setTimeout(()=>{if(state!==s||s.finished)return;locked=false;submitting=false;s.index++;render()},3000)
 }
 async function saveScore(x){await addDoc(scoresRef,{studentNo:player.studentNo,name:player.name,score:x.score,correct:x.correct,wrong:x.wrong,mode:'normal',createdAt:Date.now()})}
 function escapeHtml(v){return String(v).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#039;')}
