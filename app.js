@@ -11,20 +11,27 @@ const ALT={2:4,3:5,4:2,5:3};
 const corresponding=p=>p+4;
 const wedge=p=>p<4?p:p-4;
 
-// One geometry object controls the two parallel lines, the transversal,
-// their actual intersection points, the angle arcs and the labels.
+// 새 SVG 구조: 세 직선을 각각 독립된 <line> 요소로 생성한다.
+// 위 평행선, 아래 평행선, 횡단선을 절대로 하나의 path로 합치지 않는다.
 function geometryForTheta(theta){
   const gap=100,centerX=300,rad=theta*Math.PI/180;
   const shift=gap/Math.tan(rad);
   const top={x:centerX+shift/2,y:105};
   const bottom={x:centerX-shift/2,y:205};
-  // Extend the transversal exactly between safe SVG margins (y=30..280),
-  // so all three lines are always visibly rendered.
   const dx=top.x-bottom.x,dy=top.y-bottom.y;
-  const xAtY=y=>bottom.x+(top.x-bottom.x)*((y-bottom.y)/(top.y-bottom.y));
-  const y1=30,y2=280;
-  const line={x1:xAtY(y1),y1,x2:xAtY(y2),y2};
-  return{theta,top,bottom,line};
+  const len=Math.hypot(dx,dy),ux=dx/len,uy=dy/len;
+  const ext=115;
+  return{
+    theta,
+    top,
+    bottom,
+    transversal:{
+      x1:bottom.x-ux*ext,
+      y1:bottom.y-uy*ext,
+      x2:top.x+ux*ext,
+      y2:top.y+uy*ext
+    }
+  };
 }
 const WEDGE_RANGES=theta=>[[-180,-theta],[-theta,0],[0,180-theta],[180-theta,180]];
 function arcPath(cx,cy,w,r,theta){
@@ -37,13 +44,31 @@ function labelPoint(cx,cy,w,r,theta){
   return[cx+r*Math.cos(a),cy+r*Math.sin(a)];
 }
 function baseSvg(g,items,guide=false){
-  let s=`<svg viewBox="0 0 600 300" preserveAspectRatio="xMidYMid meet"><style>.g{stroke:#111827;stroke-width:4;fill:none;stroke-linecap:round}.arc{stroke:#6b7280;stroke-width:2;fill:none}.t{font:700 21px system-ui,sans-serif;fill:#111827;text-anchor:middle;dominant-baseline:middle}.d{stroke:#6b7280;stroke-width:1.5;stroke-dasharray:5 5;fill:none}</style>`;
-  // Explicitly render THREE separate solid lines: upper parallel, lower parallel, transversal.
-  s+=`<line class="g" x1="45" y1="105" x2="555" y2="105"/>`;
-  s+=`<line class="g" x1="45" y1="205" x2="555" y2="205"/>`;
-  s+=`<line class="g" x1="${g.line.x1.toFixed(1)}" y1="${g.line.y1}" x2="${g.line.x2.toFixed(1)}" y2="${g.line.y2}"/>`;
-  if(guide)s+='<path class="d" d="M45 80H555M45 230H555"/>';
-  items.forEach(it=>{s+=`<path class="arc" d="${arcPath(it.point.x,it.point.y,it.w,30,g.theta)}"/>`;const z=labelPoint(it.point.x,it.point.y,it.w,58,g.theta);s+=`<text class="t" x="${z[0].toFixed(1)}" y="${z[1].toFixed(1)}">${it.text}</text>`});
+  const fmt=n=>Number(n).toFixed(2);
+  let s=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 300" preserveAspectRatio="xMidYMid meet" role="img" aria-label="평행선과 횡단선으로 이루어진 각도 그림">`;
+  s+=`<style>
+    .parallel{stroke:#111;stroke-width:5;fill:none;stroke-linecap:round}
+    .transversal{stroke:#111;stroke-width:5;fill:none;stroke-linecap:round}
+    .arc{stroke:#777;stroke-width:2;fill:none}
+    .label{font:700 21px system-ui,sans-serif;fill:#111;text-anchor:middle;dominant-baseline:middle}
+    .guide{stroke:#999;stroke-width:1.5;stroke-dasharray:5 5;fill:none}
+  </style>`;
+
+  // 반드시 서로 다른 SVG line 3개.
+  s+=`<line class="parallel" x1="35" y1="105" x2="565" y2="105"/>`;
+  s+=`<line class="parallel" x1="35" y1="205" x2="565" y2="205"/>`;
+  s+=`<line class="transversal" x1="${fmt(g.transversal.x1)}" y1="${fmt(g.transversal.y1)}" x2="${fmt(g.transversal.x2)}" y2="${fmt(g.transversal.y2)}"/>`;
+
+  if(guide){
+    s+=`<line class="guide" x1="35" y1="80" x2="565" y2="80"/>`;
+    s+=`<line class="guide" x1="35" y1="230" x2="565" y2="230"/>`;
+  }
+
+  items.forEach(it=>{
+    s+=`<path class="arc" d="${arcPath(it.point.x,it.point.y,it.w,30,g.theta)}"/>`;
+    const z=labelPoint(it.point.x,it.point.y,it.w,58,g.theta);
+    s+=`<text class="label" x="${fmt(z[0])}" y="${fmt(z[1])}">${it.text}</text>`;
+  });
   return s+'</svg>';
 }
 function diagram(m){
