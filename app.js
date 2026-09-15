@@ -6,9 +6,7 @@ import {
   getDocs,
   query,
   orderBy,
-  limit,
-  deleteDoc,
-  doc
+  limit
 } from 'https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js';
 import { firebaseConfig } from './firebase-config.js';
 
@@ -42,8 +40,7 @@ function pick(a) {
   return a[Math.floor(Math.random() * a.length)];
 }
 
-// Physical angle regions around each intersection:
-// 0 upper-left, 1 upper-right, 2 lower-right, 3 lower-left.
+// 각 교점 주변의 실제 각 영역: 0 왼쪽 위, 1 오른쪽 위, 2 오른쪽 아래, 3 왼쪽 아래
 const offsets = [
   [-30, -18],
   [28, -12],
@@ -127,7 +124,6 @@ function newQuestion() {
     target = Math.floor(Math.random() * 8);
     given = target + 4;
   } else {
-    // Alternate interior angles only: top 2/3 and bottom 4/5.
     target = pick([2, 3, 4, 5]);
     given = alternatePosition(target);
   }
@@ -265,26 +261,6 @@ async function loadRanking() {
   }
 }
 
-async function resetRanking() {
-  const confirmed = confirm('현재 저장된 랭킹을 모두 삭제할까요? 이 작업은 되돌릴 수 없습니다.');
-  if (!confirmed) return;
-
-  $('resetBtn').disabled = true;
-  $('adminMessage').textContent = '랭킹 데이터를 삭제하는 중…';
-
-  try {
-    const snapshot = await getDocs(scoresRef);
-    await Promise.all(snapshot.docs.map(d => deleteDoc(doc(db, 'scores', d.id))));
-    $('adminMessage').textContent = '랭킹이 초기화되었습니다.';
-    await loadRanking();
-  } catch (error) {
-    console.error(error);
-    $('adminMessage').textContent = '초기화에 실패했습니다. Firestore 보안 규칙을 확인하세요.';
-  } finally {
-    $('resetBtn').disabled = false;
-  }
-}
-
 async function end() {
   if (!state) return;
 
@@ -332,6 +308,5 @@ $('adminLoginBtn').onclick = () => {
   }
 };
 document.querySelectorAll('.backHome').forEach(b => b.onclick = () => show('home'));
-$('resetBtn').onclick = resetRanking;
 
 loadRanking();
