@@ -14,8 +14,6 @@ const corresponding=p=>p+4;
 const wedge=p=>p<4?p:p-4;
 const isAcutePos=p=>{const w=wedge(p);return w===1||w===3};
 
-// 실제로 보이는 횡단선의 예각을 alpha로 계산한다.
-// value가 120/135/150이면 그림의 둔각 위치는 정확히 그 값이 된다.
 function geometryForTheta(theta){
   const alpha=theta<=90?theta:180-theta;
   const gap=100,centerX=300,rad=alpha*Math.PI/180;
@@ -26,6 +24,7 @@ function geometryForTheta(theta){
   const ext=115;
   return{theta,alpha,top,bottom,transversal:{x1:bottom.x-ux*ext,y1:bottom.y-uy*ext,x2:top.x+ux*ext,y2:top.y+uy*ext}};
 }
+
 const WEDGE_RANGES=alpha=>[[-180,-alpha],[-alpha,0],[0,180-alpha],[180-alpha,180]];
 function arcPath(cx,cy,w,r,alpha){
   const [a1,a2]=WEDGE_RANGES(alpha)[w],rad=d=>d*Math.PI/180;
@@ -61,14 +60,51 @@ function diagram(m){
 }
 function sizeDiagram(q){
   const g=geometryForTheta(q.theta);
-  return baseSvg(g,[{point:q.targetPoint,w:q.targetPos,text:'a'},{point:q.givenPoint,w:q.givenPos,text:q.value+'°'}],true);
+  return baseSvg(g,[{point:q.targetPoint,w:q.targetPos,text:'a'},{point:q.givenPoint,w:q.givenPos,text:q.givenValue+'°'}],true);
 }
 function labels(){const x=shuffle(LETTERS),m={};x.forEach((v,i)=>m[i]=v);return m}
 function positionsForAngle(value){return value<90?[1,3]:[0,2]}
 function relationType(){
-  // 난이도: 크기 계산 70%, 관계 찾기 30%.
-  return Math.random()<0.70?pick([3,4]):pick([1,2]);
+  // 각의 크기 문제가 80%: 단순 관계명 문제보다 실제 각의 성질을 적용하는 문제를 많이 출제한다.
+  return Math.random()<0.80?pick([3,4]):pick([1,2]);
 }
+
+function sizeQuestion(){
+  // targetPos = 구해야 할 a의 위치.
+  // givenPos는 a와 직접 동위각/엇각인 위치를 일부러 피한다.
+  // 따라서 학생은 '같은 크기'인지 '180도에서 빼야 하는지'를 판단해야 한다.
+  const targetValue=pick(ANGLES);
+  const targetPos=pick(positionsForAngle(targetValue));
+  const targetGlobal=targetPos; // target is at upper intersection for 0~3
+  const forbidden=new Set([
+    targetGlobal,
+    corresponding(targetGlobal),
+    targetGlobal^2 // 같은 교점에서 맞꼭지각인 위치도 제외
+  ]);
+  // a와 직접적인 동위각/맞꼭지각/엇각이 아닌 위치 중에서 주어진 각을 고른다.
+  // 남는 위치는 정확히 하나 이상이며, 그 각은 a와 이웃 관계가 된다.
+  const candidates=[0,1,2,3,4,5,6,7].filter(p=>!forbidden.has(p));
+  const givenGlobal=pick(candidates);
+  const sameSize=isAcutePos(givenGlobal)===isAcutePos(targetGlobal);
+  // 주어진 숫자는 그림의 givenGlobal 각의 실제 크기. a의 크기는 targetValue.
+  const givenValue=sameSize?targetValue:180-targetValue;
+  const g=geometryForTheta(targetValue);
+  const targetPoint=targetGlobal<4?g.top:g.bottom;
+  const givenPoint=givenGlobal<4?g.top:g.bottom;
+  return{
+    type:Math.random()<0.5?3:4,
+    answer:String(targetValue),
+    text:'각 a의 크기는?',
+    targetPoint,
+    givenPoint,
+    targetPos:wedge(targetGlobal),
+    givenPos:wedge(givenGlobal),
+    givenValue,
+    theta:targetValue,
+    value:targetValue
+  };
+}
+
 function newQuestion(){
   const type=relationType();
   if(type===1){
@@ -80,24 +116,7 @@ function newQuestion(){
     [m[p],m[a]]=[m[a],m[p]];
     return{type,m,answer:m[ALT[p]],text:'각 a의 엇각은?'};
   }
-
-  // 크기 문제는 반드시 '주어진 각 -> a' 관계가 하나의 값으로 결정되도록 만든다.
-  // type 3: 동위각, type 4: 엇각. 주어진 숫자는 a의 각 자체가 아니라 관계에 있는 각이다.
-  const value=pick(ANGLES);
-  const targetPos=pick(positionsForAngle(value));
-  let target,given;
-  if(type===3){
-    target=targetPos;
-    given=target+4;
-  }else{
-    // 엇각은 반드시 서로 다른 교점의 내부각(2,3,4,5) 중 하나를 사용한다.
-    target=targetPos===0?2:targetPos===2?0:targetPos===1?3:1;
-    given=ALT[target];
-  }
-  const g=geometryForTheta(value);
-  const targetPoint=target<4?g.top:g.bottom;
-  const givenPoint=given<4?g.top:g.bottom;
-  return{type,answer:String(value),text:'각 a의 크기는?',targetPoint,givenPoint,targetPos:wedge(target),givenPos:wedge(given),value,angle:value,theta:value};
+  return sizeQuestion();
 }
 function render(){
   if(!state)return;
