@@ -11,13 +11,19 @@ const ALT={2:4,3:5,4:2,5:3};
 const corresponding=p=>p+4;
 const wedge=p=>p<4?p:p-4;
 
-// Geometry is generated from the same theta that determines the actual angle.
-// This keeps the drawn transversal, intersection points, arcs and labels consistent.
+// One geometry object controls the two parallel lines, the transversal,
+// their actual intersection points, the angle arcs and the labels.
 function geometryForTheta(theta){
-  const gap=100,centerX=300,halfShift=(gap/Math.tan(theta*Math.PI/180))/2;
-  const top={x:centerX+halfShift,y:105},bottom={x:centerX-halfShift,y:205};
-  const dx=top.x-bottom.x,dy=top.y-bottom.y,len=Math.hypot(dx,dy),ux=dx/len,uy=dy/len,ext=125;
-  const line=`M${(bottom.x-ux*ext).toFixed(2)} ${(bottom.y-uy*ext).toFixed(2)}L${(top.x+ux*ext).toFixed(2)} ${(top.y+uy*ext).toFixed(2)}`;
+  const gap=100,centerX=300,rad=theta*Math.PI/180;
+  const shift=gap/Math.tan(rad);
+  const top={x:centerX+shift/2,y:105};
+  const bottom={x:centerX-shift/2,y:205};
+  // Extend the transversal exactly between safe SVG margins (y=30..280),
+  // so all three lines are always visibly rendered.
+  const dx=top.x-bottom.x,dy=top.y-bottom.y;
+  const xAtY=y=>bottom.x+(top.x-bottom.x)*((y-bottom.y)/(top.y-bottom.y));
+  const y1=30,y2=280;
+  const line={x1:xAtY(y1),y1,x2:xAtY(y2),y2};
   return{theta,top,bottom,line};
 }
 const WEDGE_RANGES=theta=>[[-180,-theta],[-theta,0],[0,180-theta],[180-theta,180]];
@@ -31,7 +37,11 @@ function labelPoint(cx,cy,w,r,theta){
   return[cx+r*Math.cos(a),cy+r*Math.sin(a)];
 }
 function baseSvg(g,items,guide=false){
-  let s=`<svg viewBox="0 0 600 300"><style>.g{stroke:#111827;stroke-width:4;fill:none;stroke-linecap:round}.arc{stroke:#6b7280;stroke-width:2;fill:none}.t{font:700 21px system-ui,sans-serif;fill:#111827;text-anchor:middle;dominant-baseline:middle}.d{stroke:#6b7280;stroke-width:1.5;stroke-dasharray:5 5;fill:none}</style><path class="g" d="M45 105H555M45 205H555M${g.line}"/>`;
+  let s=`<svg viewBox="0 0 600 300" preserveAspectRatio="xMidYMid meet"><style>.g{stroke:#111827;stroke-width:4;fill:none;stroke-linecap:round}.arc{stroke:#6b7280;stroke-width:2;fill:none}.t{font:700 21px system-ui,sans-serif;fill:#111827;text-anchor:middle;dominant-baseline:middle}.d{stroke:#6b7280;stroke-width:1.5;stroke-dasharray:5 5;fill:none}</style>`;
+  // Explicitly render THREE separate solid lines: upper parallel, lower parallel, transversal.
+  s+=`<line class="g" x1="45" y1="105" x2="555" y2="105"/>`;
+  s+=`<line class="g" x1="45" y1="205" x2="555" y2="205"/>`;
+  s+=`<line class="g" x1="${g.line.x1.toFixed(1)}" y1="${g.line.y1}" x2="${g.line.x2.toFixed(1)}" y2="${g.line.y2}"/>`;
   if(guide)s+='<path class="d" d="M45 80H555M45 230H555"/>';
   items.forEach(it=>{s+=`<path class="arc" d="${arcPath(it.point.x,it.point.y,it.w,30,g.theta)}"/>`;const z=labelPoint(it.point.x,it.point.y,it.w,58,g.theta);s+=`<text class="t" x="${z[0].toFixed(1)}" y="${z[1].toFixed(1)}">${it.text}</text>`});
   return s+'</svg>';
