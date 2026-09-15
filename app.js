@@ -22,9 +22,10 @@ const TOP={x:393,y:105};
 const BOTTOM={x:207,y:205};
 const offsets=[[-27,-30],[32,-12],[27,30],[-32,12]];
 function correspondingPosition(p){return p+4;}
-// Alternate-angle pairs: alternate exterior (0↔6, 1↔7) and alternate interior (2↔4, 3↔5).
-const ALTERNATE_MAP={0:6,1:7,2:4,3:5,4:2,5:3,6:0,7:1};
-function alternatePosition(p){return ALTERNATE_MAP[p];}
+// 엇각은 중학교 수학에서 엇각(엇각의 관계)이 성립하는 내각끼리만 출제한다.
+// 내각 위치: 2,3,4,5 / 엇각 쌍: 2↔4, 3↔5
+const ALTERNATE_INTERIOR_MAP={2:4,3:5,4:2,5:3};
+function alternateInteriorPosition(p){return ALTERNATE_INTERIOR_MAP[p];}
 function labels(){const x=shuffle(LETTERS),m={};x.forEach((v,i)=>m[i]=v);return m;}
 function arcPath(cx,cy,index,r=28){
   const angles=[[-180,-28],[-28,0],[0,152],[152,180]];
@@ -44,7 +45,16 @@ return s+'</svg>';}
 function pointForPosition(p){return p<4?TOP:BOTTOM;}
 function offsetForPosition(p){return offsets[p<4?p:p-4];}
 function sizeDiagram(q){return `<svg viewBox="0 0 600 300" role="img" aria-label="평행선과 횡단선의 각 크기 문제 그림"><style>.g{stroke:#111827;stroke-width:4;fill:none;stroke-linecap:round}.d{stroke:#6b7280;stroke-width:1.5;stroke-dasharray:5 5}.arc{stroke:#6b7280;stroke-width:2;fill:none}.t{font:700 21px system-ui,sans-serif;fill:#111827;text-anchor:middle;dominant-baseline:middle}.dot{fill:#111827}</style><path class="g" d="M45 105H555M45 205H555M85 270L515 40"/><path class="d" d="M45 80H555M45 230H555"/><path class="arc" d="${arcPath(q.targetPoint.x,q.targetPoint.y,q.targetPos)}"/><path class="arc" d="${arcPath(q.givenPoint.x,q.givenPoint.y,q.givenPos)}"/><text class="t" x="${q.targetPoint.x+q.ao[0]}" y="${q.targetPoint.y+q.ao[1]}">a</text><text class="t" x="${q.givenPoint.x+q.go[0]}" y="${q.givenPoint.y+q.go[1]}">${q.value}°</text></svg>`;}
-function newQuestion(){const type=1+Math.floor(Math.random()*4);if(type<3){const m=labels(),positionByLetter=Number(Object.keys(m).find(k=>m[k]==='a')),answer=m[type===1?correspondingPosition(positionByLetter):alternatePosition(positionByLetter)];return{type,m,answer,text:type===1?'각 a의 동위각은?':'각 a의 엇각은?'};}let target,given;if(type===3){target=Math.floor(Math.random()*8);given=correspondingPosition(target);}else{target=pick([2,3,4,5]);given=alternatePosition(target);}const value=pick(ANGLES),targetPoint=pointForPosition(target),givenPoint=pointForPosition(given),ao=offsetForPosition(target),go=offsetForPosition(given);return{type,answer:String(value),text:'각 a의 크기는?',targetPoint,givenPoint,ao,go,value,targetPos:target<4?target:target-4,givenPos:given<4?given:given-4};}
+function newQuestion(){const type=1+Math.floor(Math.random()*4);if(type===1){const m=labels(),positionByLetter=Number(Object.keys(m).find(k=>m[k]==='a')),answer=m[correspondingPosition(positionByLetter)];return{type,m,answer,text:'각 a의 동위각은?'};}if(type===2){
+  // 'a'는 반드시 두 평행선 사이의 내각에 배치한다. 그래야 a의 엇각(엇각의 관계)이 항상 존재한다.
+  const m=labels();
+  const aPosition=pick([2,3,4,5]);
+  const aLetterPosition=Number(Object.keys(m).find(k=>m[k]==='a'));
+  [m[aPosition],m[aLetterPosition]]=[m[aLetterPosition],m[aPosition]];
+  const answer=m[alternateInteriorPosition(aPosition)];
+  return{type,m,answer,text:'각 a의 엇각은?'};
+}
+let target,given;if(type===3){target=Math.floor(Math.random()*8);given=correspondingPosition(target);}else{target=pick([2,3,4,5]);given=alternateInteriorPosition(target);}const value=pick(ANGLES),targetPoint=pointForPosition(target),givenPoint=pointForPosition(given),ao=offsetForPosition(target),go=offsetForPosition(given);return{type,answer:String(value),text:'각 a의 크기는?',targetPoint,givenPoint,ao,go,value,targetPos:target<4?target:target-4,givenPos:given<4?given:given-4};}
 function render(){const q=state.q=newQuestion();$('questionNo').textContent=state.index+1;$('questionType').textContent=q.type===1?'동위각':q.type===2?'엇각':'평행선에서 각의 크기';$('questionText').textContent=q.text;$('diagram').innerHTML=q.type<3?diagram(q.m):sizeDiagram(q);$('answerInput').value='';$('answerInput').disabled=locked;if(!locked)$('answerInput').focus();}
 function start(test=false){if(!test){player.studentNo=$('studentNo').value.trim();player.name=$('studentName').value.trim();if(!player.studentNo||!player.name){$('homeMessage').textContent='학생 번호와 이름을 입력하세요.';return;}}state={score:0,correct:0,wrong:0,index:0,test};locked=false;show('game');$('score').textContent='0';$('feedback').textContent='';let t=test?TEST_TIME:NORMAL_TIME;$('timer').textContent=t;render();clearInterval(timerId);timerId=setInterval(()=>{t--;$('timer').textContent=t;if(t<=0)end();},1000);}
 function submit(e){e.preventDefault();if(!state||locked)return;const answer=$('answerInput').value.trim().toLowerCase(),correctAnswer=state.q.answer.toLowerCase(),ok=answer===correctAnswer;if(ok){state.score++;state.correct++;$('score').textContent=state.score;$('feedback').textContent='정답! +1점';state.index++;render();}else{state.score-=2;state.wrong++;$('score').textContent=state.score;locked=true;$('answerInput').disabled=true;$('feedback').textContent='오답! -2점 · 3초 동안 입력할 수 없습니다.';setTimeout(()=>{if(state){locked=false;state.index++;render();}},3000);}}
